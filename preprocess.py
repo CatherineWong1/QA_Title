@@ -1,149 +1,88 @@
 # -*- encoding:utf-8 -*_
 """
-1. 训练LDA模型或者Topic Rank模型
-2. 将所有数据送入1中train好的模型
-
-Version1:
-研究了lda模型，发现并不符合我们的场景
-
 Version2:
 利用topic rank生成关键词
-
+代码思路：
+1. 数据集中每一条sample有：abstract, patent_name, topic_phrase
+2. 将数据集按照比例随机分成两份，train和test
 """
 import os
 import random
 import json
 import re
-from nltk.corpus import stopwords
-from nltk.tokenize import RegexpTokenizer
-from nltk.stem.wordnet import WordNetLemmatizer
-from gensim.corpora.dictionary import Dictionary
-from gensim.models import Phrases
-from gensim.models import LdaModel
+from pytopicrank import TopicRank
+import nltk
+from nltk.stem import WordNetLemmatizer
+lemma = WordNetLemmatizer()
 
-
-def shuffle_dataset(data_path):
+def generate_topic(data_path):
     """
-    spilt raw data into training dataset and testing dataset
-    :param data_path: raw data path
-    :return: shuffle file and rename
+    Have these following functions:
+    1. generate top 10 topic phrase for each sample
+    2. remove samples that have can't readable char
+    :param data_path: all data
+    :return:
     """
     file_list = os.listdir(data_path)
     file_nums = len(file_list)
     random.shuffle(file_list)
     for i in range(file_nums):
-        old_name = data_path + "/" + file_list[i]
-        if i < 50:
-            new_name = data_path + "/train/" + "train.{}.txt".format(i+1)
-        else:
-            new_name = data_path + "/test/" + "train.{}.txt".format(i-49)
-        os.rename(old_name, new_name)
-
-
-def generate_vocab(train_path):
-    """
-    generate two vocabularies for train dataset: abstract vocabulary and title vocabulary
-    :param data_path:
-    :return:
-    """
-    file_list = os.listdir(train_path)
-    stop_list = stopwords.words('english')
-    abstract_vocab = {}
-    title_vocab = {}
-    for file in file_list:
-        filename = train_path + "/" + file
-        with open(filename) as f:
+        file_name = data_path + "/" + file_list[i]
+        new_name = "data/raw/" + "{}.json".format(i)
+        f_new = open(new_name,'w')
+        data_list = []
+        with open(file_name) as f:
             for line in f.readlines():
                 try:
                     data = json.loads(line)
                     abstract = data['abstract'].lower()
-                    abstract = re.sub(r'[^\x00-\x7F]','', abstract)
-                    abstract = abstract.split(" ")
-                    title = data['patent_name'].lower().split(" ")
-                    for word in abstract:
-                        if word not in stop_list:
-                            if not word in abstract_vocab:
-                                abstract_vocab[word] = 0
-                            abstract_vocab[word] += 1
-
-                    for word in title:
-                        if word not in stop_list:
-                            if not word in title_vocab:
-                                title_vocab[word] = 0
-                            title_vocab[word] += 1
+                    data_title = data['patent_name'].lower()
+                    title_word = nltk.word_tokenize(data_title)
+                    if len(title_word) < 5:
+                        continue
+                    abstract = abstract.replace(" &# 39 ; s ", ' ')
+                    abstract = re.sub(r'[^a-z\s]', '', abstract)
+                    word_list = nltk.word_tokenize(abstract)
+                    word_list = [lemma.lemmatize(item) for item in word_list]
+                    title_word = [lemma.lemmatize(item) for item in title_word]
+                    abstract = " ".join(word_list)
+                    data_title = " ".join(title_word)
+                    data['abstract'] = abstract
+                    data['patent_name'] = data_title
+                    tp = TopicRank(abstract)
+                    data['topic'] = tp.get_top_n(n=10)
+                    if len(data['topic']) < 10:
+                        continue
+                    data_list.append(data)
                 except Exception as e:
                     continue
+        f_new.write(json.dumps(data_list))
+        f_new.close()
 
-    return abstract_vocab, title_vocab
 
-
-def process_lda_data(abstract):
+def split_dataset(raw_path, dst_path):
     """
-    process abstract for lda
-    :param abstract: abstract list
-    :return: formatted data for lda model
-    """
-    docs = []
-    # remove numeric tokens and single character
-    tokenizer = RegexpTokenizer(r'\w+')
-    for item in abstract:
-        word_list = tokenizer.tokenize(item)
-        word_list = [word for word in word_list if len(word) > 1]
-        docs.append(word_list)
-
-    # compute bigrams, add phrase like machine_learning
-    # I used very small corpus to train this model and used the same sentences to inference. No working
-    bigram = Phrases(docs, min_count=5)
-    for idx in range(len(docs)):
-        for token in bigram[docs[idx]]:
-            if '_' in token:
-                docs[idx].append(token)
-
-    return docs
-
-
-def train_lda(corpus_path):
-    """
-    train lda model
-    :param corpus_path: data path
+    The ratio is 1:9
+    :param raw_path:
     :return:
     """
-    abstract_list = []
-    # load lda corpus
-    file_list = os.listdir(corpus_path)
-    file_list = [corpus_path+"/"+file for file in file_list]
-    for file in file_list:
-        with open(file) as f:
-            for line in f.readlines():
-                data = json.loads(line)
-                abstract = data['abstract'].lower()
-                abstract = re.sub(r'[^\x00-\x7F]','', abstract)
-                abstract_list.append(abstract)
+    file_list = os.listdir(raw_path)
+    file_nums = len(file_list)
+    random.shuffle(file_list)
+    test = file_nums // 9
+    for i in range(file_nums):
+        old_name = raw_path + file_list[i]
+        if i < test:
+            new_name = dst_path + "test.{}.json".format(i+1)
+        else:
+            new_name = dst_path + "train.{}.json".format(i-test+1)
 
-    # process lda data
-    docs = process_lda_data(abstract)
-    dictionary = Dictionary(docs)
-
-    # bag-of-words
-    corpus = [dictionary.doc2bow(doc) for doc in docs]
-    print("Number of unique tokens: %d" % len(dictionary))
-
-    # set training parameters
-    num_topic = 3
-    chunk_size = 1000
-    passes = 20
-    iterations = 2000
-
-    temp = dictionary[0]
-    id2word = dictionary.id2token
-    model = LdaModel(corpus=corpus, num_topics=num_topic, id2word=id2word, chunksize=chunk_size,passes=passes,
-                     alpha='auto', eta='auto',eval_every=None,iterations=iterations)
-
-    top_topics = model.top_topics(corpus, topn=5)
+        os.rename(old_name, new_name)
 
 
-    #avg_topics_coherence = sum([t[1] for t in top_topics]) / num_topic
-    from pprint import pprint
-    pprint(top_topics)
 
-    # remain to generate key word vocabulary
+if __name__ == '__main__':
+    raw_path = "data/raw/"
+    dst_path = "data/patent/"
+    #generate_topic(raw_path)
+    split_dataset(raw_path, dst_path)
