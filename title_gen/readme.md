@@ -26,4 +26,5 @@
 * 增加了一个Epoch结束后，打印loss；删除了一个Batch Data中出现的Log
 * 增加了一个Epoch结束后，保存模型的代码段。同时由于要保存Embedding的state_dict(), 修改了Model中Encoder和Decoder这块的init函数。
 * 增加了load之前训练好的model，继续训练的代码段
+* 增加了eval()函数，同时修改了train_iters()这个函数。
 ```
