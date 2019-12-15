@@ -19,6 +19,7 @@
 * 模型用的是CPU，还没有将CUDA用起来
 * 去除padding的影响，但是由于target的padding有两类，一类是常规的index的padding, 一类是type的padding,由于type是0，1标注，因此对于type是否能够消除padding的影响存疑。
 * 数据中topic phrase的生成。目前使用的是github某一开源代码：pytopicrank
+* 在看Pytorch的官方Tutorial（NMT和Chatbot）的时候，发现了一种teacher forcing的机制。它有一个明显的缺点就是在inference阶段，因为没有ground truth作为输入，会得到不太好的perfomance，但是依然有很多人去用。关于Teacher Forcing，ACL2019的Best Paper《Bridging the Gap between Training and Inference for Neural Machine Translation》中有提到解决方案。[实际工程中参考博客](https://machinelearningmastery.com/teacher-forcing-for-recurrent-neural-networks/)
 ```
 # 2019-12-13优化记录
 ## 已完成
