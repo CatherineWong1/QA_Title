@@ -20,7 +20,7 @@
 ```
 Notes:
 * 关于Teacher Forcing，ACL2019的Best Paper《Bridging the Gap between Training and Inference for Neural Machine Translation》中有提到解决方案。
-* [实际工程中参考博客](https://machinelearningmastery.com/teacher-forcing-for-recurrent-neural-networks/)
+
 # Version1优化记录
 ## 已完成
 ```
