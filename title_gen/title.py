@@ -48,7 +48,9 @@ def criterion(predict_output, target_output, vg_p, target_gate):
     """
     loss_1 = F.binary_cross_entropy(predict_output, target_output.float())
     loss_2 = F.binary_cross_entropy(vg_p, target_gate.float())
-    return loss_1 + loss_2
+    loss = loss_1 + loss_2
+    loss = loss.to(device)
+    return loss
 
 
 def train(inputs, lengths,target_gate, target_tensor, max_target_len, encoder_optimizer, decoder_optimizer,
@@ -67,10 +69,10 @@ def train(inputs, lengths,target_gate, target_tensor, max_target_len, encoder_op
     decoder_optimizer.zero_grad()
 
     # set device options
-    #inputs = inputs.to(device)
-    #lengths = lengths.to(device)
-    #target_gate = target_gate.to(device)
-    #target_tensor = target_tensor.to(device)
+    inputs = inputs.to(device)
+    lengths = lengths.to(device)
+    target_gate = target_gate.to(device)
+    target_tensor = target_tensor.to(device)
 
     # Initial paramters
     loss = 0
@@ -79,7 +81,7 @@ def train(inputs, lengths,target_gate, target_tensor, max_target_len, encoder_op
     encoder_outputs, encoder_hidden = encoder(inputs, lengths)
     
     decoder_input = torch.LongTensor([[SOS_token for _ in range(batch_size)]])
-    #decoder_input = decoder_input.to(device)
+    decoder_input = decoder_input.to(device)
   
     decoder_hidden = encoder_hidden[:1]
     
@@ -88,10 +90,10 @@ def train(inputs, lengths,target_gate, target_tensor, max_target_len, encoder_op
         # topk:return values and indicies
         _, top_ind = predict_output.topk(1)
         decoder_input = torch.LongTensor([[top_ind[i][0] for i in range(batch_size)]])
-        #decoder_input = decoder_input.to(device) 
-
+        decoder_input = decoder_input.to(device) 
+         
         # Calculate and accumulate loss
-        # 如果timestep不一致怎么办？
+        vg_p = vg_p.to(device) 
         loss += criterion(predict_output, target_tensor[timestep], vg_p, target_gate[timestep])
         #print("The loss of timestep {} is {}".format(timestep, loss))
         #if decoder_input.item() == EOS_token:
@@ -115,6 +117,10 @@ def train_iter(args):
     decoder = DecoderRnn(args.dec_hidden_size, 1, 10, ordinary_size, args.dec_drop, args.batch_size)
     encoder_optimizer = optim.Adam(encoder.parameters(), lr=args.learning_rate)
     decoder_optimizer = optim.Adam(decoder.parameters(), lr=args.learning_rate*args.decoder_learning_ratio)
+    
+    # set device
+    encoder = encoder.to(device)
+    decoder = decoder.to(device)
     logger.info("Training......")
     # train num epoch
     for i in range(1, args.epochs):
