@@ -46,8 +46,8 @@ def criterion(predict_output, target_output, vg_p, target_gate):
     :param target_gate: (batch_size,2)
     :return:
     """
-    loss_1 = F.binary_cross_entropy(predict_output, target_output)
-    loss_2 = F.binary_cross_entropy(vg_p, target_gate)
+    loss_1 = F.binary_cross_entropy(predict_output, target_output.float())
+    loss_2 = F.binary_cross_entropy(vg_p, target_gate.float())
     return loss_1 + loss_2
 
 
@@ -62,9 +62,6 @@ def train(inputs, lengths,target_gate, target_tensor, max_target_len, encoder_op
     :param max_target_len:
     :return:
     """
-    # Initial encoder and decoder
-
-
     # zero gradients
     encoder_optimizer.zero_grad()
     decoder_optimizer.zero_grad()
@@ -85,20 +82,20 @@ def train(inputs, lengths,target_gate, target_tensor, max_target_len, encoder_op
     #decoder_input = decoder_input.to(device)
   
     decoder_hidden = encoder_hidden[:1]
+    
     for timestep in range(max_target_len):
         predict_output, vg_p,decoder_hidden = decoder(decoder_input, decoder_hidden, encoder_outputs)
         # topk:return values and indicies
         _, top_ind = predict_output.topk(1)
         decoder_input = torch.LongTensor([[top_ind[i][0] for i in range(batch_size)]])
-        decoder_input = decoder_input.to(device)
-        
+        #decoder_input = decoder_input.to(device) 
 
         # Calculate and accumulate loss
         # 如果timestep不一致怎么办？
         loss += criterion(predict_output, target_tensor[timestep], vg_p, target_gate[timestep])
-        print("The loss of timestep {} is {}".format(timestep, loss))
-        if decoder_input.item() == EOS_token:
-            break
+        #print("The loss of timestep {} is {}".format(timestep, loss))
+        #if decoder_input.item() == EOS_token:
+        #    break
     loss.backward()
     encoder_optimizer.step()
     decoder_optimizer.step()
@@ -127,16 +124,18 @@ def train_iter(args):
             batch_title_ind, batch_title_type = padding_batch_title(batch[1], batch[2], batch[4])
             abstract_lengths = batch[3]
             title_lengths = batch[4]
-            input = torch.tensor(batch_abstract)
+            inputs = torch.tensor(batch_abstract).transpose(0,1)
             lengths = torch.tensor(abstract_lengths)
-            target_gate = torch.tensor(batch_title_type)
-            target_tensor = torch.tensor(batch_title_ind)
-            loss = train(input, lengths, target_gate, target_tensor, max(title_lengths),encoder_optimizer, decoder_optimizer,
+            target_gate = torch.tensor(batch_title_type).transpose(0,1)
+            target_tensor = torch.tensor(batch_title_ind).transpose(0,1)
+            targets = F.one_hot(target_tensor,num_classes=ordinary_size+10)
+            loss = train(inputs, lengths, target_gate, targets, max(title_lengths),encoder_optimizer, decoder_optimizer,
                          encoder, decoder, args.batch_size)
             total_loss += loss
             iterations += 1
             if iterations % 10 == 0:
                 logger.info("Loss avg of {} iterations is {}".format(iterations,total_loss/iterations))
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
