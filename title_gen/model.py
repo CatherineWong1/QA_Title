@@ -1,8 +1,8 @@
 # -*- encoding:utf-8 -*-
 """
 本模块实现question的生成
-Encoder 3层 BiLSTM, 也可以改成GRU
-Decoder 3层 LSTM + normal attention + topic attention
+Encoder 1层 BiGRU
+Decoder 1层 GRU + normal attention + topic attention
 """
 import torch
 import torch.nn as nn
@@ -37,7 +37,6 @@ class EncoderRnn(nn.Module):
         """
         # packed input sequence
         embedded = self.embedding(input_index)
-        embedded = embedded.transpose(0,1) 
         packed = nn.utils.rnn.pack_padded_sequence(embedded, input_lengths, enforce_sorted=False)
         outputs, hidden = self.gru(packed, hidden)
 
@@ -71,16 +70,16 @@ class DecoderRnn(nn.Module):
         self.gru = nn.GRU(hidden_size, hidden_size, n_layers)
 
         # Vocabulary gate
-        self.vg_linear = nn.Linear(hidden_size, 2,bias=False)
+        self.vg_linear = nn.Linear(hidden_size, 1, bias=False)
 
         # generate function
         self.gt = nn.Linear(hidden_size,topic_size, bias=False)
         self.go = nn.Linear(hidden_size, ordinary_size, bias=False)
 
     def cal_vog(self, hidden, last_output, context):
-        self.b_vog = nn.Parameter(torch.randn(self.batch_size,2))
+        self.b_vog = nn.Parameter(torch.randn(self.batch_size, 1))
         self.in_vog = self.vg_linear(hidden) + self.vg_linear(last_output) + self.vg_linear(context) + self.b_vog
-        self.p_vog = F.sigmoid(self.in_vog)
+        self.p_vog = torch.sigmoid(self.in_vog)
 
         return self.p_vog
 
@@ -118,8 +117,6 @@ class DecoderRnn(nn.Module):
         vg_p = self.cal_vog(rnn_output, embedded, context)
         p_topic, p_ordinary = self.cal_prop(rnn_output, embedded)
         # (batch_size, ordinary_vocab+topic_vocab)
-        print(vg_p.size())
-        print(p_ordinary.size())
         final_output = torch.cat(((1-vg_p)*p_ordinary, vg_p*p_topic),1)
 
         return final_output, vg_p, hidden
