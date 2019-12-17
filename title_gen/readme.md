@@ -16,9 +16,10 @@
 * 数据处理的过程中，未将SOS和EOS加入到标题的首尾。
 * 去除padding的影响，但是由于target的padding有两类，一类是常规的index的padding, 一类是type的padding,由于type是0，1标注，因此对于type是否能够消除padding的影响存疑。
 * 数据中topic phrase的生成。目前使用的是github某一开源代码：pytopicrank
-* 在看Pytorch的官方Tutorial（NMT和Chatbot）的时候，发现了一种teacher forcing的机制。它有一个明显的缺点就是在inference阶段，因为没有ground truth作为输入，会得到不太好的perfomance，但是依然有很多人去用。
+* 没有使用Beam Search的方法来生成。后续可以加上。
 ```
 Notes:
+* 在看Pytorch的官方Tutorial（NMT和Chatbot）的时候，发现了一种teacher forcing的机制。它有一个明显的缺点就是在inference阶段，因为没有ground truth作为输入，会得到不太好的perfomance，但是依然有很多人去用。
 * 关于Teacher Forcing，ACL2019的Best Paper《Bridging the Gap between Training and Inference for Neural Machine Translation》中有提到解决方案。
 
 # Version1优化记录
