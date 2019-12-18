@@ -21,6 +21,7 @@
 Notes:
 * 在看Pytorch的官方Tutorial（NMT和Chatbot）的时候，发现了一种teacher forcing的机制。它有一个明显的缺点就是在inference阶段，因为没有ground truth作为输入，会得到不太好的perfomance，但是依然有很多人去用。
 * 关于Teacher Forcing，ACL2019的Best Paper《Bridging the Gap between Training and Inference for Neural Machine Translation》中有提到解决方案。
+* 关于padding的影响，如果使用了mask, 可以使用mask将attention中的pad token置0.从而在Attention这块消除pad的影响。
 
 # Version1优化记录
 ## 已完成
