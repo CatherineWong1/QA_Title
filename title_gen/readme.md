@@ -5,11 +5,6 @@
 * pytopicrank
 ```
 # Version1待优化记录
-## 待完成
-```
-* 编写eval函数
-* 编写rouge测试函数
-```
 ## 待优化
 ```
 * 在生成阶段，原计划是生成到EOS token后停止生成,但是由于是一个minibatch的数据，这样好像无法因为某一条数据生成EOS而停止
@@ -17,6 +12,8 @@
 * 去除padding的影响，但是由于target的padding有两类，一类是常规的index的padding, 一类是type的padding,由于type是0，1标注，因此对于type是否能够消除padding的影响存疑。
 * 数据中topic phrase的生成。目前使用的是github某一开源代码：pytopicrank
 * 没有使用Beam Search的方法来生成。后续可以加上。
+* 没有实现循环多个epoch,目前只可以根据train data分成iterations个batch size的数据，然后进行训练。
+* 数据的加载过慢，GPU训练很快，这块需要优化。
 ```
 Notes:
 * 在看Pytorch的官方Tutorial（NMT和Chatbot）的时候，发现了一种teacher forcing的机制。它有一个明显的缺点就是在inference阶段，因为没有ground truth作为输入，会得到不太好的perfomance，但是依然有很多人去用。
@@ -31,4 +28,5 @@ Notes:
 * 增加了load之前训练好的model，继续训练的代码段
 * 增加了eval()函数，同时修改了train_iters()这个函数。目前eval()函数还未加上
 * 模型可在GPU上进行训练。
+* 增加了Rouge评估函数
 ```
