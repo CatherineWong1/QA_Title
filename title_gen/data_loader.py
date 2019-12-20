@@ -32,26 +32,36 @@ def load_dataset(files):
 
 
 class Dataset(object):
-    def __init__(self, data_path, batch_size, corpus_type):
-        self.corpus_type = corpus_type
-        self.files = sorted(glob2.glob(data_path + corpus_type + '.[0-9]*.json'))
+    def __init__(self, data_path, batch_size):
+        self.files = sorted(glob2.glob(data_path + 'train' + '.[0-9]*.json'))
+        self.test_files = sorted(glob2.glob(data_path + 'test' + '.[0-9]*.json'))
         self.abstract_vocab = []
         self.ordinary_vocab = []
         self.generate_abstract()
         self.generate_ordinary()
         self.batch_size = batch_size
         self.cur_iter = load_dataset(self.files)
+        self.test_iter = load_dataset(self.test_files)
 
     def generate_abstract(self):
         """
         generate abstract vocab for encoder phase
         sort vocab with frequency
-        :param data_path: train data path
+        :param data_path: train abstract data and test abstract data
         :param vocab_path: abstract vocab path
         :return:
         """
         logger.info("Generate Abstract Vocab List, according to the alphabet")
         for file in self.files:
+            with open(file) as f:
+                data_list = json.load(f)
+                for data in data_list:
+                    word_list = nltk.word_tokenize(data['abstract'])
+                    for word in word_list:
+                        if word not in self.abstract_vocab:
+                            self.abstract_vocab.append(word)
+
+        for file in self.test_files:
             with open(file) as f:
                 data_list = json.load(f)
                 for data in data_list:
@@ -111,6 +121,10 @@ class Dataset(object):
         i = 0
         sum_title_vocab = self.ordinary_vocab + sample['topic']
         while i < len(title_words) - 1:
+            if title_words[i] in sample['topic']:
+                title_type.append(1)
+                title_ind.append(sum_title_vocab.index(title_words[i]))
+
             if title_words[i] not in sample['topic']:
                 phrase = " ".join([title_words[i], title_words[i + 1]])
                 if phrase in sample['topic']:
@@ -118,12 +132,10 @@ class Dataset(object):
                     title_ind.append(sum_title_vocab.index(phrase))
                     i += 2
                     continue
-                else:
-                    title_ind.append(sum_title_vocab.index(title_words[i]))
-                    title_type.append(0)
-                    if i + 1 == len(title_words) - 1:
-                        title_ind.append(sum_title_vocab.index(title_words[i+1]))
-                        title_type.append(0)
+
+                title_type.append(0)
+                title_ind.append(sum_title_vocab.index(title_words[i]))
+
             i += 1
 
         assert len(title_ind) == len(title_type)
@@ -136,9 +148,7 @@ class Dataset(object):
         batch_title_type = []
         abstract_lengths = []
         title_lenghts = []
-        # 这块不确定是否需要加 while true, 需要实际跑的过程中关注
         for data_list in self.cur_iter:
-            logger.info("Generating Batch Data")
             # process batch data
             for sample in data_list:
                 res = self.generate_ind(sample)
@@ -149,7 +159,6 @@ class Dataset(object):
                 title_lenghts.append(res[4])
 
                 if len(batch_abstract) == self.batch_size:
-                    logger.info("One Batch Data is Finished")
                     yield batch_abstract, batch_title_ind, batch_title_type, abstract_lengths, title_lenghts
                     batch_abstract = []
                     batch_title_ind = []
@@ -157,9 +166,42 @@ class Dataset(object):
                     abstract_lengths = []
                     title_lenghts = []
 
+    def create_test(self):
+        """
+        Generate test data just need abstract and abstract index
+        :return:
+        """
+        logger.info("Generate Testing Data")
+        batch_abstract = []
+        batch_abstract_txt = []
+        batch_title_txt = []
+        abstract_lengths = []
+        batch_topic = []
+        for data_list in self.test_iter:
+            for sample in data_list:
+                abstract_words = nltk.word_tokenize(sample['abstract'])
+                abstract_ind = []
+                for word in abstract_words:
+                    abstract_ind.append(self.abstract_vocab.index(word))
+                batch_abstract.append(abstract_ind)
+                abstract_lengths.append(len(abstract_ind))
+                batch_abstract_txt.append(sample['abstract'])
+                batch_title_txt.append(sample['patent_name'])
+                batch_topic.append(sample['topic'])
+
+                if len(batch_abstract) == self.batch_size:
+                    yield batch_abstract, batch_abstract_txt, abstract_lengths, batch_title_txt, batch_topic
+                    batch_abstract = []
+                    batch_abstract_txt = []
+                    batch_title_txt = []
+                    abstract_lengths = []
+                    batch_topic = []
+
 
 if __name__ == '__main__':
     data_path = "data/demo_data/"
-    data_demo = Dataset(data_path, 8, corpus_type='train')
+    data_demo = Dataset(data_path, 1)
+    print(data_demo.ordinary_vocab)
+    print(len(data_demo.abstract_vocab))
     for data in data_demo.create_batch():
         print(data)
